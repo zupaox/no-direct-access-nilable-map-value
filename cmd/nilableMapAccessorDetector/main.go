@@ -101,7 +101,7 @@ func detectUnsafeMapAccess(allNodes []*MyNode, pass *analysis.Pass) []DetectResu
 			continue
 		}
 
-		mapIden, ok := n.Children[0].AstNode.(*ast.Ident)
+		mapIden, ok := n.Children[0].AstNode.(ast.Expr)
 		if !ok {
 			// we always expect the first child of a indexExpr to be an identifier
 			// if not, we skip it

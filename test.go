@@ -65,10 +65,17 @@ func main() {
 
 	// slice index checking is not in this scope, so this is considered ok
 	arrays[0].CCC()
+
+	// this is bad as well
+	(&s).FFF["ddd"].CCC()
+
+	// this is bad as well
+	(&s).Map()["ddd"].CCC()
 }
 
 type ABC struct {
 	BBB string
+	FFF map[string]*ABC
 }
 
 func (a *ABC) CCC() {
@@ -77,4 +84,10 @@ func (a *ABC) CCC() {
 
 func (a *ABC) Clone() *ABC {
 	return &ABC{}
+}
+
+func (a *ABC) Map() map[string]*ABC {
+	return map[string]*ABC{
+		"AAA": a.Clone(),
+	}
 }
