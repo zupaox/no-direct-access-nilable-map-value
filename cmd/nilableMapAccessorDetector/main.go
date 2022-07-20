@@ -117,18 +117,26 @@ func detectUnsafeMapAccess(allNodes []*MyNode, pass *analysis.Pass) []DetectResu
 
 		if parentIsAssignment {
 			lhs := assStmt.Lhs
+
+			_, firstIsVar := lhs[0].(*ast.Ident)
+
 			if len(lhs) < 2 {
-				detected = append(detected, DetectResult{
-					Issue:      "assignment lhs variable length < 2",
-					FileName:   filePath,
-					LineNumber: lineNumber,
-					LinePos:    int(linePos),
-				})
+				if firstIsVar {
+					detected = append(detected, DetectResult{
+						Issue:      "assignment lhs variable length < 2",
+						FileName:   filePath,
+						LineNumber: lineNumber,
+						LinePos:    int(linePos),
+					})
+				}
+
+				// for assign value to a map like: someMap["abc"] = d
+				// we should not flag it
 				continue
 			}
 
-			variable, ok := lhs[1].(*ast.Ident)
-			if ok && variable.Name == "_" {
+			secondVar, ok := lhs[1].(*ast.Ident)
+			if ok && secondVar.Name == "_" {
 				detected = append(detected, DetectResult{
 					Issue:      "skipped key existence checking with _",
 					FileName:   filePath,

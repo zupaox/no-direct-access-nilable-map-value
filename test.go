@@ -31,6 +31,12 @@ func main() {
 	// this is bad
 	pointers["bbb"].CCC()
 
+	// this is ok
+	pointers["ccc"] = &ABC{}
+
+	// this is bad
+	pointers["ccc"] = pointers["aaa"].Clone()
+
 	// this is good
 	assignment, ok := pointers["bbb"]
 	if ok {
@@ -61,4 +67,8 @@ type ABC struct {
 
 func (a *ABC) CCC() {
 	fmt.Printf("CCC")
+}
+
+func (a *ABC) Clone() *ABC {
+	return &ABC{}
 }
