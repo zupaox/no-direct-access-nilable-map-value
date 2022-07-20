@@ -10,7 +10,7 @@ import (
 )
 
 var analyzer = &analysis.Analyzer{
-	Name: "no-direct-access=nilable-map-value",
+	Name: "Test",
 	Doc:  "reports warning when code trys to access map value that is nilable without using assignment",
 	Run:  runAnalysis,
 }
@@ -42,15 +42,6 @@ func runAnalysis(pass *analysis.Pass) (interface{}, error) {
 		})
 	}
 
-	/*
-		printMyNodes(1, roots, func(n *MyNode) string {
-			indexExpr, ok := n.AstNode.(*ast.IndexExpr)
-			if !ok {
-				return "-"
-			}
-			return fmt.Sprintf("index express, exp: %v, parent node type: %v, type: %v", indexExpr.X, reflect.TypeOf(n.Parent.AstNode), pass.TypesInfo.TypeOf(indexExpr))
-		})
-	*/
 	detectUnsafeMapAccess(allNodes, pass)
 	return nil, nil
 }
@@ -87,8 +78,17 @@ func detectUnsafeMapAccess(allNodes []*MyNode, pass *analysis.Pass) {
 			continue
 		}
 
-		_, parentIsAssignment := n.Parent.AstNode.(*ast.AssignStmt)
+		assStmt, parentIsAssignment := n.Parent.AstNode.(*ast.AssignStmt)
 		if parentIsAssignment {
+			lhs := assStmt.Lhs
+			if len(lhs) < 2 {
+				fmt.Printf("warning (%v): Please ensure key existed first (len < 2).\n", n.Parent.AstNode)
+				continue
+			}
+			variable, ok := lhs[1].(*ast.Ident)
+			if ok && variable.Name == "_" {
+				fmt.Printf("warning (%v): Please ensure key existed first.\n", n.Parent.AstNode)
+			}
 			continue
 		}
 

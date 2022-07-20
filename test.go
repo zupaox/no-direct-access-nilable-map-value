@@ -14,6 +14,7 @@ func main() {
 		},
 	}
 
+	// this is bad
 	if handlers["ccc"]() {
 		fmt.Printf("ccc")
 	}
@@ -22,19 +23,26 @@ func main() {
 	pointers := map[string]*ABC{
 		"aaa": &aaa,
 	}
+
+	// this is bad
 	fmt.Printf("value: %v", pointers["bbb"].BBB)
+	// this is bad
 	pointers["bbb"].CCC()
 
+	// this is good
 	assignment, ok := pointers["bbb"]
 	if ok {
 		assignment.CCC()
 	}
 
 	structs := map[string]ABC{}
-	s, ok := structs["bbb"]
-	if ok {
-		(&s).CCC()
-	}
+	// this is bad
+	s, _ := structs["bbb"]
+	(&s).CCC()
+
+	// this is bad
+	s = structs["ccc"]
+	(&s).CCC()
 }
 
 type ABC struct {
