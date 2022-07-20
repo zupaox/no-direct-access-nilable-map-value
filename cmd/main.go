@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"go/ast"
+	"os"
+	"reflect"
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
@@ -44,8 +46,26 @@ func runAnalysis(pass *analysis.Pass) (interface{}, error) {
 		})
 	}
 
-	detectUnsafeMapAccess(allNodes, pass)
+	// printNodes(roots, 1)
+	unsafeAccesses := detectUnsafeMapAccess(allNodes, pass)
+	if len(unsafeAccesses) > 0 {
+		printDetectResults(unsafeAccesses)
+		os.Exit(1)
+	}
 	return nil, nil
+}
+
+func printNodes(root []*MyNode, level int) {
+	for _, node := range root {
+		fmt.Printf("%v %v(%v)\n", strings.Repeat("  ", level), reflect.TypeOf(node.AstNode), node.AstNode)
+		printNodes(node.Children, level+1)
+	}
+}
+
+func printDetectResults(results []DetectResult) {
+	for _, result := range results {
+		fmt.Printf("Detected issue: %v, file: %v, line: %v, line pos: %v\n", result.Issue, result.FileName, result.LineNumber, result.LinePos)
+	}
 }
 
 // because go/analysis always walk the nodes depth first
@@ -66,14 +86,15 @@ func addParent(n *MyNode, allNodes []*MyNode) bool {
 	return false
 }
 
-func printMyNodes(level int, roots []*MyNode, formatter func(n *MyNode) string) {
-	for _, n := range roots {
-		fmt.Printf("%v %v\n", strings.Repeat("  ", level), formatter(n))
-		printMyNodes(level+1, n.Children, formatter)
-	}
+type DetectResult struct {
+	Issue      string
+	FileName   string
+	LineNumber int
+	LinePos    int
 }
 
-func detectUnsafeMapAccess(allNodes []*MyNode, pass *analysis.Pass) {
+func detectUnsafeMapAccess(allNodes []*MyNode, pass *analysis.Pass) []DetectResult {
+	var detected []DetectResult
 	for _, n := range allNodes {
 		indexExpr, ok := n.AstNode.(*ast.IndexExpr)
 		if !ok {
@@ -88,25 +109,45 @@ func detectUnsafeMapAccess(allNodes []*MyNode, pass *analysis.Pass) {
 		assStmt, parentIsAssignment := n.Parent.AstNode.(*ast.AssignStmt)
 
 		indexType := pass.TypesInfo.TypeOf(indexExpr)
-		valueIsNilable := strings.HasPrefix(indexType.String(), "func") || strings.HasPrefix(indexType.String(), "*command-line-arguments")
+		valueIsNilable := strings.HasPrefix(indexType.String(), "func") || strings.HasPrefix(indexType.String(), "(func") || strings.HasPrefix(indexType.String(), "*") || strings.HasPrefix(indexType.String(), "(*")
 
-		if parentIsAssignment && valueIsNilable {
+		if !valueIsNilable {
+			continue
+		}
+
+		if parentIsAssignment {
 			lhs := assStmt.Lhs
 			if len(lhs) < 2 {
-				fmt.Printf("warning (%v: %v %v): Please ensure key existed first (len < 2).\n", filePath, lineNumber, linePos)
+				detected = append(detected, DetectResult{
+					Issue:      "assignment lhs variable length < 2",
+					FileName:   filePath,
+					LineNumber: lineNumber,
+					LinePos:    int(linePos),
+				})
 				continue
 			}
+
 			variable, ok := lhs[1].(*ast.Ident)
 			if ok && variable.Name == "_" {
-				fmt.Printf("warning (%v: %v %v): Please ensure key existed (underscore).\n", filePath, lineNumber, linePos)
+				detected = append(detected, DetectResult{
+					Issue:      "skipped key existence checking with _",
+					FileName:   filePath,
+					LineNumber: lineNumber,
+					LinePos:    int(linePos),
+				})
 			}
 			continue
 		}
 
-		if valueIsNilable {
-			fmt.Printf("warning (%v: %v %v): Please ensure key existed (direct access, %v).\n", filePath, lineNumber, linePos, indexType.String())
-		}
+		detected = append(detected, DetectResult{
+			Issue:      "direct access to nilable map value",
+			FileName:   filePath,
+			LineNumber: lineNumber,
+			LinePos:    int(linePos),
+		})
 	}
+
+	return detected
 }
 
 func main() {

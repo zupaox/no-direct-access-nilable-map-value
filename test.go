@@ -1,6 +1,8 @@
 package test
 
-import "fmt"
+import (
+	"fmt"
+)
 
 func main() {
 	handlers := map[string]func() bool{
@@ -35,12 +37,20 @@ func main() {
 		assignment.CCC()
 	}
 
-	structs := map[string]ABC{}
 	// this is bad
+	p, _ := pointers["DDD"]
+	p.CCC()
+
+	// this is bad
+	p = pointers["bbb"]
+	p.CCC()
+
+	structs := map[string]ABC{}
+	// this is ok
 	s, _ := structs["bbb"]
 	(&s).CCC()
 
-	// this is bad
+	// this is ok
 	s = structs["ccc"]
 	(&s).CCC()
 }
