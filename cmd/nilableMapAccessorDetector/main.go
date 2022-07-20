@@ -12,7 +12,7 @@ import (
 )
 
 var analyzer = &analysis.Analyzer{
-	Name: "Test",
+	Name: "NilableMapAccessorDetector",
 	Doc:  "reports warning when code trys to access map value that is nilable without using assignment",
 	Run:  runAnalysis,
 }
