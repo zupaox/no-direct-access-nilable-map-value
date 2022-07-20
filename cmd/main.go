@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/singlechecker"
+	"golang.org/x/tools/go/analysis/multichecker"
 )
 
 var analyzer = &analysis.Analyzer{
@@ -19,6 +19,7 @@ type MyNode struct {
 	AstNode  ast.Node
 	Children []*MyNode
 	Parent   *MyNode
+	File     *ast.File
 }
 
 func runAnalysis(pass *analysis.Pass) (interface{}, error) {
@@ -31,6 +32,7 @@ func runAnalysis(pass *analysis.Pass) (interface{}, error) {
 					AstNode:  n,
 					Children: []*MyNode{},
 					Parent:   nil,
+					File:     file,
 				}
 				found := addParent(&n, allNodes)
 				if !found {
@@ -78,27 +80,35 @@ func detectUnsafeMapAccess(allNodes []*MyNode, pass *analysis.Pass) {
 			continue
 		}
 
+		sourceFile := pass.Fset.File(n.AstNode.Pos())
+		filePath := sourceFile.Name()
+		lineNumber := sourceFile.Line(n.AstNode.Pos())
+		lineStart := sourceFile.LineStart(lineNumber)
+		linePos := n.AstNode.Pos() - lineStart
 		assStmt, parentIsAssignment := n.Parent.AstNode.(*ast.AssignStmt)
-		if parentIsAssignment {
+
+		indexType := pass.TypesInfo.TypeOf(indexExpr)
+		valueIsNilable := strings.HasPrefix(indexType.String(), "func") || strings.HasPrefix(indexType.String(), "*command-line-arguments")
+
+		if parentIsAssignment && valueIsNilable {
 			lhs := assStmt.Lhs
 			if len(lhs) < 2 {
-				fmt.Printf("warning (%v): Please ensure key existed first (len < 2).\n", n.Parent.AstNode)
+				fmt.Printf("warning (%v: %v %v): Please ensure key existed first (len < 2).\n", filePath, lineNumber, linePos)
 				continue
 			}
 			variable, ok := lhs[1].(*ast.Ident)
 			if ok && variable.Name == "_" {
-				fmt.Printf("warning (%v): Please ensure key existed first.\n", n.Parent.AstNode)
+				fmt.Printf("warning (%v: %v %v): Please ensure key existed (underscore).\n", filePath, lineNumber, linePos)
 			}
 			continue
 		}
 
-		indexType := pass.TypesInfo.TypeOf(indexExpr)
-		if strings.HasPrefix(indexType.String(), "func") || strings.HasPrefix(indexType.String(), "*command-line-arguments") {
-			fmt.Printf("warning (%v): Unsafe direct access to map with func value or pointer value, please use assignment style to access the value and check key existence.\n", n.AstNode)
+		if valueIsNilable {
+			fmt.Printf("warning (%v: %v %v): Please ensure key existed (direct access, %v).\n", filePath, lineNumber, linePos, indexType.String())
 		}
 	}
 }
 
 func main() {
-	singlechecker.Main(analyzer)
+	multichecker.Main(analyzer)
 }
