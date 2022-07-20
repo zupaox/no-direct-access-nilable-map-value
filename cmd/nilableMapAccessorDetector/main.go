@@ -101,6 +101,21 @@ func detectUnsafeMapAccess(allNodes []*MyNode, pass *analysis.Pass) []DetectResu
 			continue
 		}
 
+		mapIden, ok := n.Children[0].AstNode.(*ast.Ident)
+		if !ok {
+			// we always expect the first child of a indexExpr to be an identifier
+			// if not, we skip it
+			fmt.Printf("incorrect first child type for node: %v, type of first child: %v\n", n.AstNode, reflect.TypeOf(n.Children[0].AstNode))
+			continue
+		}
+
+		childType := pass.TypesInfo.TypeOf(mapIden)
+		if !strings.HasPrefix(childType.String(), "map") {
+			// both slice access and map access will be categoried as IndexExpr
+			// so we only process map accesses
+			continue
+		}
+
 		sourceFile := pass.Fset.File(n.AstNode.Pos())
 		filePath := sourceFile.Name()
 		lineNumber := sourceFile.Line(n.AstNode.Pos())

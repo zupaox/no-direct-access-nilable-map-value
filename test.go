@@ -59,6 +59,12 @@ func main() {
 	// this is ok
 	s = structs["ccc"]
 	(&s).CCC()
+
+	// this is bad since it direct access to something possibily nil
+	arrays := []*ABC{pointers["aaa"]}
+
+	// slice index checking is not in this scope, so this is considered ok
+	arrays[0].CCC()
 }
 
 type ABC struct {
